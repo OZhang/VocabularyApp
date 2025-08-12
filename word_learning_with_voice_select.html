@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>单词学习（带语音选择）</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .container { display: flex; gap: 40px; }
+        .column { flex: 1; }
+        .word { margin: 4px 0; cursor: pointer; }
+        .eng { color: blue; }
+        .pos { color: green; margin: 0 5px; }
+        .cn { color: #555; }
+        select, input { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <h2>单词学习工具（带语音选择）</h2>
+    <input type="file" id="fileInput" accept=".txt"><br>
+    <label>显示模式: </label>
+    <select id="filterSelect">
+        <option value="all">全部</option>
+        <option value="eng">只显示英文</option>
+        <option value="cn">只显示中文</option>
+    </select>
+    <label>朗读语音: </label>
+    <select id="voiceSelect"></select>
+    <div class="container">
+        <div class="column" id="col1"></div>
+        <div class="column" id="col2"></div>
+    </div>
+<script>
+let wordsThree = [];
+let wordsFour = [];
+let voices = [];
+let selectedVoice = null;
+
+function loadVoices() {
+    voices = speechSynthesis.getVoices();
+    const voiceSelect = document.getElementById('voiceSelect');
+    voiceSelect.innerHTML = '';
+    voices.forEach((voice, index) => {
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = `${voice.name} (${voice.lang})` + (voice.default ? ' [默认]' : '');
+        voiceSelect.appendChild(option);
+    });
+    if (voices.length > 0) {
+        voiceSelect.selectedIndex = 0;
+        selectedVoice = voices[0];
+    }
+}
+
+speechSynthesis.onvoiceschanged = loadVoices;
+
+document.getElementById('voiceSelect').addEventListener('change', function() {
+    const index = parseInt(this.value);
+    selectedVoice = voices[index];
+});
+
+document.getElementById('fileInput').addEventListener('change', function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        parseWords(e.target.result);
+        renderWords();
+    };
+    reader.readAsText(file, 'UTF-8');
+});
+
+document.getElementById('filterSelect').addEventListener('change', renderWords);
+
+function parseWords(text) {
+    wordsThree = [];
+    wordsFour = [];
+    const lines = text.split(/\r?\n/);
+    let currentPart = 0;
+    const posList = ["n.", "v.", "adj.", "adv.", "prep.", "conj."];
+    lines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+        if (!/^\d+\./.test(trimmed)) { currentPart++; return; }
+        const firstSpace = trimmed.indexOf(' ');
+        if (firstSpace === -1) return;
+        const number = trimmed.substring(0, firstSpace).trim();
+        const rest = trimmed.substring(firstSpace + 1);
+        let posIndex = -1;
+        let foundPos = "";
+        for (const pos of posList) {
+            posIndex = rest.indexOf(` ${pos} `);
+            if (posIndex >= 0) { foundPos = pos; break; }
+        }
+        if (posIndex > 0) {
+            const english = rest.substring(0, posIndex).trim();
+            const chinese = rest.substring(posIndex + foundPos.length + 1).trim();
+            const item = { num: number, eng: english, pos: foundPos, cn: chinese };
+            if (currentPart === 1) wordsThree.push(item);
+            else if (currentPart === 2) wordsFour.push(item);
+        }
+    });
+}
+
+function renderWords() {
+    const filter = document.getElementById('filterSelect').value;
+    renderColumn(document.getElementById('col1'), wordsThree, filter);
+    renderColumn(document.getElementById('col2'), wordsFour, filter);
+}
+
+function renderColumn(container, list, filter) {
+    container.innerHTML = "";
+    list.forEach(word => {
+        const div = document.createElement('div');
+        div.className = 'word';
+        let html = `<span class="num">${word.num}. </span>`;
+        if (filter !== 'cn') html += `<span class="eng" onclick="speak('${word.eng}')">${word.eng}</span>`;
+        if (filter === 'all') html += `<span class="pos">${word.pos}</span>`;
+        if (filter !== 'eng') html += `<span class="cn">${word.cn}</span>`;
+        div.innerHTML = html;
+        container.appendChild(div);
+    });
+}
+
+function speak(text) {
+    if (!selectedVoice) loadVoices();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = selectedVoice ? selectedVoice.lang : 'en-US';
+    utterance.voice = selectedVoice || null;
+    speechSynthesis.speak(utterance);
+}
+</script>
+</body>
+</html>
