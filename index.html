@@ -39,7 +39,9 @@ function loadVoices() {
     voices = speechSynthesis.getVoices();
     const voiceSelect = document.getElementById('voiceSelect');
     voiceSelect.innerHTML = '';
-    voices.forEach((voice, index) => {
+    // 筛选出所有语言为 'en' 开头的语音
+    const englishVoices = voices.filter(voice => voice.lang.startsWith('en'));
+    englishVoices.forEach((voice, index) => {
         const option = document.createElement('option');
         option.value = index;
         option.textContent = `${voice.name} (${voice.lang})` + (voice.default ? ' [默认]' : '');
